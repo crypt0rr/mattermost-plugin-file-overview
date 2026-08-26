@@ -314,6 +314,7 @@
 }
 
 .file-overview__error,
+.file-overview__access-denied,
 .file-overview__notice {
     padding: 8px 10px;
     border-radius: 4px;
@@ -326,6 +327,10 @@
 }
 
 .file-overview__error p {
+    margin: 0 0 8px;
+}
+
+.file-overview__access-denied p {
     margin: 0 0 8px;
 }
 
