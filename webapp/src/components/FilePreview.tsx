@@ -1,10 +1,10 @@
 import React, {useEffect, useRef} from 'react';
 import {createPortal} from 'react-dom';
 
-import {Client4} from 'mattermost-redux/client';
-
+import {fileKind} from '../format';
 import {t} from '../messages';
 import type {FileOverviewItem} from '../types';
+import {mattermostFilePreviewUrl, mattermostFileUrl} from '../urls';
 
 type Props = {
     file: FileOverviewItem;
@@ -13,6 +13,7 @@ type Props = {
 
 export default function FilePreview({file, onClose}: Props) {
     const closeButton = useRef<HTMLButtonElement>(null);
+    const kind = fileKind(file.mime_type, file.extension);
 
     useEffect(() => {
         const previousFocus = document.activeElement as HTMLElement | null;
@@ -54,10 +55,31 @@ export default function FilePreview({file, onClose}: Props) {
                 >
                     {'×'}
                 </button>
-                <img
-                    src={Client4.getFilePreviewUrl(file.id, 0)}
-                    alt={t('previewAlt', {name: file.name})}
-                />
+                {kind === 'image' && (
+                    <img
+                        src={mattermostFilePreviewUrl(file.id)}
+                        alt={t('previewAlt', {name: file.name})}
+                    />
+                )}
+                {kind === 'video' && (
+                    <video
+                        className='file-overview__preview-video'
+                        src={mattermostFileUrl(file.id)}
+                        controls={true}
+                        playsInline={true}
+                        preload='metadata'
+                        aria-label={t('previewAlt', {name: file.name})}
+                    />
+                )}
+                {kind === 'audio' && (
+                    <audio
+                        className='file-overview__preview-audio'
+                        src={mattermostFileUrl(file.id)}
+                        controls={true}
+                        preload='metadata'
+                        aria-label={t('previewAlt', {name: file.name})}
+                    />
+                )}
             </div>
         </div>,
         document.body,

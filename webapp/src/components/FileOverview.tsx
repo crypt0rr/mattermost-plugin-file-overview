@@ -25,6 +25,7 @@ import {
     validateExtension,
 } from '../search';
 import type {FileOverviewItem, FileOverviewSort} from '../types';
+import {mattermostPostPermalink} from '../urls';
 
 import '../file_overview.scss';
 
@@ -51,11 +52,6 @@ function sortItems(items: FileOverviewItem[], sort: FileOverviewSort): FileOverv
         const result = leftValue - rightValue;
         return sort.direction === 'asc' ? result : -result;
     });
-}
-
-function postPermalink(file: FileOverviewItem, team?: Team): string {
-    const teamPrefix = team?.name ? `${Client4.getUrl()}/${team.name}` : Client4.getUrl();
-    return `${teamPrefix}/pl/${file.post_id}`;
 }
 
 function errorMessage(error: unknown): string {
@@ -307,7 +303,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
         if (!file.post_id) {
             return;
         }
-        const url = postPermalink(file, team);
+        const url = mattermostPostPermalink(file.post_id, team?.name);
         if (navigator.clipboard?.writeText) {
             await navigator.clipboard.writeText(url);
             return;
@@ -327,7 +323,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
         if (!file.post_id) {
             return;
         }
-        window.location.assign(postPermalink(file, team));
+        window.location.assign(mattermostPostPermalink(file.post_id, team?.name));
     };
 
     const closePreview = useCallback(() => setPreviewFile(undefined), []);

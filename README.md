@@ -8,7 +8,7 @@ The preview above is an illustrative UI preview. The plugin uses the active Matt
 
 ## Status and compatibility
 
-Release `v0.1.0` targets Mattermost Team Edition `v11.7.0` through `v11.10.x`:
+Release `v0.1.2` targets Mattermost Team Edition `v11.7.0` through `v11.10.x`:
 
 - `v11.7` is the compatibility-floor / ESR target.
 - `v11.10` is the latest target release at the time of this implementation.
@@ -24,9 +24,9 @@ The plugin deliberately uses Mattermost's supported plugin API and webapp regist
 - Search by a literal filename phrase and/or validated extension.
 - Search public/private channels with team search and DM/GM conversations with global search.
 - Filter native search results again by channel ID before displaying them.
-- Open/download through authenticated Mattermost file URLs.
-- Preview supported images in a bounded top-level lightbox with a visible close button, Escape-key support, and backdrop-to-close behavior.
-- Jump to the containing post and copy a full Mattermost permalink to it. Files without a containing post do not show a copy action.
+- Preview supported images, videos, and audio in the sidebar; provide an explicit authenticated `Open file` fallback for PDFs and other file types.
+- Preview supported media in a bounded top-level lightbox with a visible close button, Escape-key support, and backdrop-to-close behavior.
+- Jump to the containing post and copy a full absolute Mattermost permalink to it. Files without a containing post do not show a copy action.
 - Resolve uploader profiles through Mattermost client APIs, with an `Unknown user` fallback.
 - Refresh the first page when relevant post/file WebSocket events arrive for the active channel.
 - Use a theme-aware file icon, Mattermost CSS variables, visible focus states, localized English strings, and narrow RHS-friendly layout.
@@ -66,7 +66,7 @@ Native search inherits Mattermost configuration and indexing behavior. If file s
    make dist
    ```
 
-3. In Mattermost, open **System Console → Plugins → Management**, upload `dist/com.github.crypt0rr.file-overview-0.1.0.tar.gz`, and enable **File Overview**.
+3. In Mattermost, open **System Console → Plugins → Management**, upload `dist/com.github.crypt0rr.file-overview-0.1.2.tar.gz`, and enable **File Overview**.
 4. Open a conversation and use the file icon in the channel header.
 
 Copied links are full Mattermost post permalinks. Recipients must be signed in and have permission to access the conversation; the plugin does not create public file links.
@@ -121,7 +121,7 @@ Before publishing a release:
 2. Install the produced archive on the latest supported v11.7 patch and v11.10 Team Edition instances.
 3. Exercise public/private channels, DMs, GMs, archived-readable conversations, pagination beyond 125 files, multiple files per post, images/documents, deleted posts, and deleted uploaders.
 4. Verify private-channel authorization, search-disabled behavior, previews, downloads, copied links, post navigation, WebSocket refresh, disable/reactivate, and uninstall.
-5. Update `plugin.json` to the release version and tag it, for example `v0.1.0`.
+5. Update `plugin.json` to the release version and tag it, for example `v0.1.2`.
 
 The repository includes CI checks for Go tests and coverage, webapp tests and coverage, linting, TypeScript checking, production builds, packaging, and artifact upload.
 
