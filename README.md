@@ -8,7 +8,7 @@ The preview above is an illustrative UI preview. The plugin uses the active Matt
 
 ## Status and compatibility
 
-Release `v0.2.0` targets Mattermost Team Edition `v11.7.0` through `v11.10.x`:
+Release `v0.3.0` targets Mattermost Team Edition `v11.7.0` through `v11.10.x`:
 
 - `v11.7` is the compatibility-floor / ESR target.
 - `v11.10` is the latest target release at the time of this implementation.
@@ -24,6 +24,8 @@ The plugin deliberately uses Mattermost's supported plugin API and webapp regist
 - Search by a literal filename phrase and/or validated extension.
 - Search public/private channels with team search and DM/GM conversations with global search.
 - Filter native search results again by channel ID before displaying them.
+- Show the message context for each file and group adjacent attachments shared by the same post.
+- Resolve message context in bulk through Mattermost's supported post API, with safe fallbacks for deleted or unavailable posts.
 - Preview supported images, videos, audio, PDFs, and text in a bounded in-sidebar viewer with native controls, keyboard navigation, and a visible close button.
 - Keep unsupported formats on an explicit authenticated `Open file` fallback without automatic navigation from the preview viewer.
 - Jump to the containing post and copy a full absolute Mattermost permalink to it. Files without a containing post do not show a copy action.
@@ -66,7 +68,7 @@ Native search inherits Mattermost configuration and indexing behavior. If file s
    make dist
    ```
 
-3. In Mattermost, open **System Console → Plugins → Management**, upload `dist/com.github.crypt0rr.file-overview-0.2.0.tar.gz`, and enable **File Overview**.
+3. In Mattermost, open **System Console → Plugins → Management**, upload `dist/com.github.crypt0rr.file-overview-0.3.0.tar.gz`, and enable **File Overview**.
 4. Open a conversation and use the file icon in the channel header.
 
 Copied links are full Mattermost post permalinks. Recipients must be signed in and have permission to access the conversation; the plugin does not create public file links.
@@ -121,7 +123,7 @@ Before publishing a release:
 2. Install the produced archive on the latest supported v11.7 patch and v11.10 Team Edition instances.
 3. Exercise public/private channels, DMs, GMs, archived-readable conversations, pagination beyond 125 files, multiple files per post, images/documents, deleted posts, and deleted uploaders.
 4. Verify private-channel authorization, search-disabled behavior, previews, downloads, copied links, post navigation, WebSocket refresh, disable/reactivate, and uninstall.
-5. Update `plugin.json` to the release version and tag it, for example `v0.2.0`.
+5. Update `plugin.json` to the release version and tag it, for example `v0.3.0`.
 
 The repository includes CI checks for Go tests and coverage, webapp tests and coverage, linting, TypeScript checking, production builds, packaging, and artifact upload.
 

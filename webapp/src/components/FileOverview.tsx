@@ -17,6 +17,7 @@ import FileRow from './FileRow';
 
 import {FileOverviewApiError, getChannelFiles} from '../api';
 import {t} from '../messages';
+import {loadPostContexts} from '../post_context';
 import {
     buildSearchRequest,
     isFileSearchUnavailable,
@@ -24,7 +25,7 @@ import {
     searchConversationFiles,
     validateExtension,
 } from '../search';
-import type {FileOverviewItem, FileOverviewSort} from '../types';
+import type {FileOverviewItem, FileOverviewSort, FilePostContext} from '../types';
 import {mattermostPostPermalink} from '../urls';
 
 import '../file_overview.scss';
@@ -72,6 +73,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
     const team = teamProp || selectedTeam;
     const [files, setFiles] = useState<FileOverviewItem[]>([]);
     const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
+    const [postContexts, setPostContexts] = useState<Record<string, FilePostContext | null>>({});
     const [participants, setParticipants] = useState<UserProfile[]>([]);
     const [sort, setSort] = useState<FileOverviewSort>(defaultSort);
     const [page, setPage] = useState(0);
@@ -92,13 +94,23 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
     const requestSerial = useRef(0);
     const abortController = useRef<AbortController>();
     const requestedProfiles = useRef(new Set<string>());
+    const postContextInFlight = useRef(new Set<string>());
+    const postContextGeneration = useRef(0);
 
     const channelId = channel?.id || '';
     const channelName = channel?.display_name || channel?.name || t('channelFiles');
+    const invalidatePostContexts = useCallback(() => {
+        postContextGeneration.current += 1;
+        postContextInFlight.current.clear();
+        setPostContexts({});
+    }, []);
 
     const loadBrowse = useCallback(async (nextPage: number, append: boolean) => {
         if (!channelId) {
             return;
+        }
+        if (!append) {
+            invalidatePostContexts();
         }
         abortController.current?.abort();
         const controller = new AbortController();
@@ -128,11 +140,14 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
                 setLoadingMore(false);
             }
         }
-    }, [channelId, sort]);
+    }, [channelId, invalidatePostContexts, sort]);
 
     const loadSearch = useCallback(async (nextPage: number, append: boolean, request: SearchState) => {
         if (!channel || participantsError) {
             return;
+        }
+        if (!append) {
+            invalidatePostContexts();
         }
         const serial = ++requestSerial.current;
         if (append) {
@@ -170,7 +185,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
                 setLoadingMore(false);
             }
         }
-    }, [channel, currentUserId, participants, participantsError]);
+    }, [channel, currentUserId, invalidatePostContexts, participants, participantsError]);
 
     useEffect(() => {
         setQueryInput('');
@@ -182,7 +197,8 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
         setPage(0);
         setHasMore(false);
         setPreviewFile(undefined);
-    }, [channelId]);
+        invalidatePostContexts();
+    }, [channelId, invalidatePostContexts]);
 
     useEffect(() => {
         if (!channelId || activeSearch) {
@@ -240,7 +256,13 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
     }, [channel]);
 
     useEffect(() => {
-        const creatorIds = [...new Set(files.map((file) => file.creator_id).filter(Boolean))];
+        const profileIds = [
+            ...files.map((file) => file.creator_id),
+            ...Object.values(postContexts).
+                filter((context): context is FilePostContext => Boolean(context)).
+                map((context) => context.user_id),
+        ];
+        const creatorIds = [...new Set(profileIds.filter(Boolean))];
         const missingIds = creatorIds.filter((id) => !profiles[id] && !requestedProfiles.current.has(id));
         if (missingIds.length === 0) {
             return undefined;
@@ -254,7 +276,48 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
                 // A missing or deleted uploader is rendered as "Unknown user".
             });
         return undefined;
-    }, [files, profiles]);
+    }, [files, postContexts, profiles]);
+
+    useEffect(() => {
+        if (!channelId || files.some((file) => file.channel_id !== channelId)) {
+            return undefined;
+        }
+
+        const postIds = [...new Set(files.map((file) => file.post_id).filter(Boolean))];
+        const missingPostIds = postIds.filter((postId) => !Object.prototype.hasOwnProperty.call(postContexts, postId) && !postContextInFlight.current.has(postId));
+        if (missingPostIds.length === 0) {
+            return undefined;
+        }
+
+        missingPostIds.forEach((postId) => postContextInFlight.current.add(postId));
+        const generation = postContextGeneration.current;
+        loadPostContexts(missingPostIds, channelId).
+            then((loadedContexts) => {
+                if (generation !== postContextGeneration.current) {
+                    return;
+                }
+                setPostContexts((current) => missingPostIds.reduce<Record<string, FilePostContext | null>>((next, postId) => {
+                    next[postId] = loadedContexts[postId] || null;
+                    return next;
+                }, {...current}));
+            }).
+            catch(() => {
+                if (generation !== postContextGeneration.current) {
+                    return;
+                }
+                setPostContexts((current) => missingPostIds.reduce<Record<string, FilePostContext | null>>((next, postId) => {
+                    next[postId] = null;
+                    return next;
+                }, {...current}));
+            }).
+            finally(() => {
+                if (generation === postContextGeneration.current) {
+                    missingPostIds.forEach((postId) => postContextInFlight.current.delete(postId));
+                }
+            });
+
+        return undefined;
+    }, [channelId, files, postContexts]);
 
     useEffect(() => {
         const refresh = () => setRefreshToken((current) => current + 1);
@@ -264,6 +327,12 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
 
     const visibleFiles = useMemo(() => sortItems(files, sort), [files, sort]);
     const extensionSuggestions = useMemo(() => [...new Set(files.map((file) => file.extension).filter(Boolean))].sort(), [files]);
+    const postAttachmentCounts = useMemo(() => files.reduce<Record<string, number>>((counts, file) => {
+        if (file.post_id) {
+            counts[file.post_id] = (counts[file.post_id] || 0) + 1;
+        }
+        return counts;
+    }, {}), [files]);
     const previewIndex = previewFile ? visibleFiles.findIndex((file) => file.id === previewFile.id) : -1;
 
     const submitSearch = async (event: FormEvent) => {
@@ -503,16 +572,28 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
                         className='file-overview__list'
                         aria-label={t('channelFiles')}
                     >
-                        {visibleFiles.map((file) => (
-                            <FileRow
-                                key={file.id}
-                                file={file}
-                                user={profiles[file.creator_id]}
-                                onPreview={openPreview}
-                                onJump={jumpToPost}
-                                onCopy={copyPostLink}
-                            />
-                        ))}
+                        {visibleFiles.map((file, index) => {
+                            const previousFile = visibleFiles[index - 1];
+                            const groupedWithPrevious = Boolean(file.post_id && previousFile?.post_id === file.post_id);
+                            const hasPostContext = Boolean(file.post_id && Object.prototype.hasOwnProperty.call(postContexts, file.post_id));
+                            const postContext = file.post_id && hasPostContext ? postContexts[file.post_id] || undefined : undefined;
+                            return (
+                                <FileRow
+                                    key={file.id}
+                                    file={file}
+                                    user={profiles[file.creator_id]}
+                                    onPreview={openPreview}
+                                    onJump={jumpToPost}
+                                    onCopy={copyPostLink}
+                                    postContext={postContext}
+                                    postContextLoading={Boolean(file.post_id && !hasPostContext)}
+                                    postAuthor={postContext ? profiles[postContext.user_id] : undefined}
+                                    postAttachmentCount={file.post_id ? postAttachmentCounts[file.post_id] : undefined}
+                                    showPostContext={!groupedWithPrevious}
+                                    groupedWithPrevious={groupedWithPrevious}
+                                />
+                            );
+                        })}
                     </div>
                 )}
                 {hasMore && !loading && (
