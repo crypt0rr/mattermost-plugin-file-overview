@@ -279,6 +279,47 @@
     position: relative;
     max-width: min(90vw, 960px);
     max-height: calc(100vh - 48px);
+    overflow: hidden;
+    border-radius: 6px;
+    background: var(--center-channel-bg, #fff);
+    color: var(--center-channel-color, #222);
+}
+
+.file-overview__preview-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 56px 12px 16px;
+    border-bottom: 1px solid var(--file-overview-border);
+}
+
+.file-overview__preview-heading {
+    min-width: 0;
+}
+
+.file-overview__preview-heading h2 {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: 16px;
+}
+
+.file-overview__preview-heading p {
+    margin: 4px 0 0;
+    color: var(--file-overview-muted);
+    font-size: 11px;
+}
+
+.file-overview__preview-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: min(60vw, 640px);
+    min-height: 120px;
+    max-height: calc(100vh - 180px);
+    padding: 16px;
+    overflow: auto;
+    box-sizing: border-box;
 }
 
 .file-overview__preview img {
@@ -302,10 +343,40 @@
     max-width: 100%;
 }
 
+.file-overview__preview-document {
+    width: min(80vw, 900px);
+    height: min(65vh, 680px);
+    border: 0;
+    background: var(--center-channel-bg, #fff);
+}
+
+.file-overview__preview-fallback {
+    padding: 24px;
+    text-align: center;
+}
+
+.file-overview__preview-fallback p {
+    margin: 0 0 12px;
+}
+
+.file-overview__preview-actions,
+.file-overview__preview-navigation {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-top: 1px solid var(--file-overview-border);
+}
+
+.file-overview__preview-actions a {
+    color: var(--link-color);
+    font-size: 12px;
+}
+
 .file-overview__preview-close {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 12px;
+    right: 12px;
     z-index: 1;
     min-width: 36px;
     min-height: 36px;

@@ -3,6 +3,7 @@ import type {UserProfile} from '@mattermost/types/users';
 import {
     displayUser,
     fileKind,
+    filePreviewKind,
     formatFileDate,
     formatFileSize,
 } from './format';
@@ -25,7 +26,16 @@ test('uses a stable uploader fallback and identifies file kinds', () => {
     expect(fileKind('application/octet-stream', 'pdf')).toBe('pdf');
     expect(fileKind('video/mp4', 'mp4')).toBe('video');
     expect(fileKind('audio/mpeg', 'mp3')).toBe('audio');
+    expect(fileKind('application/octet-stream', '.mp4')).toBe('video');
+    expect(fileKind('text/plain', 'txt')).toBe('text');
     expect(fileKind('application/octet-stream', 'bin')).toBe('file');
+    expect(filePreviewKind('image/png', 'png', true)).toBe('image');
+    expect(filePreviewKind('image/png', 'png', false)).toBeUndefined();
+    expect(filePreviewKind('application/pdf', 'pdf', false)).toBe('pdf');
+    expect(filePreviewKind('video/mp4', 'mp4', false)).toBe('video');
+    expect(filePreviewKind('audio/mpeg', 'mp3', false)).toBe('audio');
+    expect(filePreviewKind('text/plain', 'txt', false)).toBe('text');
+    expect(filePreviewKind('application/octet-stream', 'bin', false)).toBeUndefined();
 });
 
 test('formats upload dates as localized date-time strings', () => {

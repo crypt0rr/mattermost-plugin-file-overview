@@ -4,10 +4,18 @@ import type {UserProfile} from '@mattermost/types/users';
 
 import {Client4} from 'mattermost-redux/client';
 
-import {displayUser, fileKind, formatFileDate, formatFileSize} from '../format';
+import {displayUser, fileKind, filePreviewKind, formatFileDate, formatFileSize} from '../format';
 import {t} from '../messages';
 import type {FileOverviewItem} from '../types';
 import {mattermostFileUrl} from '../urls';
+
+const previewGlyphs = {
+    image: '',
+    video: '▶',
+    audio: '♫',
+    pdf: 'PDF',
+    text: 'TXT',
+} as const;
 
 type Props = {
     file: FileOverviewItem;
@@ -20,11 +28,12 @@ type Props = {
 export default function FileRow({file, user, onPreview, onJump, onCopy}: Props) {
     const [copied, setCopied] = useState(false);
     const kind = fileKind(file.mime_type, file.extension);
-    const canPreview = (file.has_preview_image && kind === 'image') || kind === 'video' || kind === 'audio';
+    const previewKind = filePreviewKind(file.mime_type, file.extension, file.has_preview_image);
+    const canPreview = previewKind !== undefined;
     const fileURL = mattermostFileUrl(file.id);
 
     const handleNameClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
-        if (!canPreview) {
+        if (!previewKind) {
             return;
         }
         event.preventDefault();
@@ -44,17 +53,21 @@ export default function FileRow({file, user, onPreview, onJump, onCopy}: Props) 
     return (
         <article className='file-overview__row'>
             <div className={`file-overview__thumbnail file-overview__thumbnail--${kind}`}>
-                {canPreview ? (
+                {previewKind ? (
                     <button
                         className='file-overview__thumbnail-button'
                         type='button'
                         aria-label={t('preview', {name: file.name})}
                         onClick={() => onPreview(file)}
                     >
-                        <img
-                            src={Client4.getFileThumbnailUrl(file.id, 0)}
-                            alt=''
-                        />
+                        {previewKind === 'image' ? (
+                            <img
+                                src={Client4.getFileThumbnailUrl(file.id, 0)}
+                                alt=''
+                            />
+                        ) : (
+                            <span aria-hidden='true'>{previewGlyphs[previewKind]}</span>
+                        )}
                     </button>
                 ) : (
                     <span aria-hidden='true'>{'📄'}</span>

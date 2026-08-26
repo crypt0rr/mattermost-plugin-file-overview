@@ -181,6 +181,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
         setFiles([]);
         setPage(0);
         setHasMore(false);
+        setPreviewFile(undefined);
     }, [channelId]);
 
     useEffect(() => {
@@ -263,6 +264,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
 
     const visibleFiles = useMemo(() => sortItems(files, sort), [files, sort]);
     const extensionSuggestions = useMemo(() => [...new Set(files.map((file) => file.extension).filter(Boolean))].sort(), [files]);
+    const previewIndex = previewFile ? visibleFiles.findIndex((file) => file.id === previewFile.id) : -1;
 
     const submitSearch = async (event: FormEvent) => {
         event.preventDefault();
@@ -327,6 +329,20 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
     };
 
     const closePreview = useCallback(() => setPreviewFile(undefined), []);
+
+    const previousPreview = useCallback(() => {
+        if (previewIndex > 0) {
+            setPreviewFile(visibleFiles[previewIndex - 1]);
+        }
+    }, [previewIndex, visibleFiles]);
+
+    const nextPreview = useCallback(() => {
+        if (previewIndex >= 0 && previewIndex < visibleFiles.length - 1) {
+            setPreviewFile(visibleFiles[previewIndex + 1]);
+        }
+    }, [previewIndex, visibleFiles]);
+
+    const openPreview = useCallback((file: FileOverviewItem) => setPreviewFile(file), []);
 
     const canSearch = !participantsLoading && !participantsError && Boolean(channel);
     const initialLoading = loading && files.length === 0;
@@ -492,7 +508,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
                                 key={file.id}
                                 file={file}
                                 user={profiles[file.creator_id]}
-                                onPreview={setPreviewFile}
+                                onPreview={openPreview}
                                 onJump={jumpToPost}
                                 onCopy={copyPostLink}
                             />
@@ -510,9 +526,16 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
                     </button>
                 )}
             </div>
-            {previewFile && (
+            {previewFile && previewIndex >= 0 && (
                 <FilePreview
                     file={previewFile}
+                    user={profiles[previewFile.creator_id]}
+                    position={previewIndex + 1}
+                    total={visibleFiles.length}
+                    hasPrevious={previewIndex > 0}
+                    hasNext={previewIndex < visibleFiles.length - 1}
+                    onPrevious={previousPreview}
+                    onNext={nextPreview}
                     onClose={closePreview}
                 />
             )}
