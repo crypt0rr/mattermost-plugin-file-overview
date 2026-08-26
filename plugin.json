@@ -1,11 +1,11 @@
 {
     "id": "com.github.crypt0rr.file-overview",
     "name": "File Overview",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "description": "Browse files attached to the current Mattermost conversation.",
     "homepage_url": "https://github.com/crypt0rr/mattermost-plugin-file-overview",
     "support_url": "https://github.com/crypt0rr/mattermost-plugin-file-overview/issues",
-    "release_notes_url": "https://github.com/crypt0rr/mattermost-plugin-file-overview/releases/tag/v0.3.0",
+    "release_notes_url": "https://github.com/crypt0rr/mattermost-plugin-file-overview/releases/tag/v0.3.1",
     "icon_path": "assets/file-overview-icon.svg",
     "min_server_version": "11.7.0",
     "server": {

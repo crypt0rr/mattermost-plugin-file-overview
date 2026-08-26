@@ -564,6 +564,62 @@ test('shows initial loading, error, permission, and retry states', async () => {
     genericRenderer.unmount();
 });
 
+test('clears cached files and an open preview when access is revoked', async () => {
+    getChannelFilesMock.mockResolvedValueOnce(response([file()]));
+    mockClient4.getPostsByIds.mockResolvedValueOnce([post()]);
+    const renderer = await renderOverview();
+    await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+    });
+    expect(renderer.root.findAllByType('article')).toHaveLength(1);
+    expect(renderer.root.findAllByProps({className: 'file-overview__post-context'})).toHaveLength(1);
+
+    await act(async () => {
+        findButton(renderer, (button) => button.props['aria-label'] === 'Preview file').props.onClick();
+        await Promise.resolve();
+    });
+    expect(renderer.root.findAllByProps({role: 'dialog'})).toHaveLength(1);
+
+    getChannelFilesMock.mockRejectedValueOnce(new FileOverviewApiError('forbidden', 403));
+    await act(async () => {
+        findButton(renderer, (button) => button.props['aria-label'] === 'Refresh files').props.onClick();
+        await Promise.resolve();
+    });
+
+    expect(renderer.root.findAllByType('article')).toHaveLength(0);
+    expect(renderer.root.findAllByProps({className: 'file-overview__post-context'})).toHaveLength(0);
+    expect(renderer.root.findAllByProps({role: 'dialog'})).toHaveLength(0);
+    expect(nodeText(renderer.root.findByProps({className: 'file-overview__access-denied'}))).toContain('no longer have permission');
+
+    getChannelFilesMock.mockResolvedValueOnce(response([file({id: 'restored-file', name: 'restored.txt'})]));
+    await act(async () => {
+        findButton(renderer, (button) => buttonText(button) === 'Retry').props.onClick();
+        await Promise.resolve();
+    });
+
+    expect(renderer.root.findAllByType('article')).toHaveLength(1);
+    expect(renderer.root.findAllByProps({className: 'file-overview__access-denied'})).toHaveLength(0);
+    expect(renderer.root.findAllByProps({className: 'file-overview__name'})[0].children.join('')).toBe('restored.txt');
+    renderer.unmount();
+});
+
+test('clears cached browse files when native search loses access', async () => {
+    getChannelFilesMock.mockResolvedValueOnce(response([file()]));
+    searchConversationFilesMock.mockRejectedValueOnce({statusCode: 401});
+    const renderer = await renderOverview();
+
+    await act(async () => {
+        renderer.root.findByProps({id: 'file-overview-query'}).props.onChange({target: {value: 'report'}});
+        renderer.root.findByType('form').props.onSubmit({preventDefault: jest.fn()});
+        await Promise.resolve();
+    });
+
+    expect(renderer.root.findAllByType('article')).toHaveLength(0);
+    expect(nodeText(renderer.root.findByProps({className: 'file-overview__access-denied'}))).toContain('no longer have permission');
+    renderer.unmount();
+});
+
 test('previews video and audio files without navigating away', async () => {
     const video = file({
         id: 'video-1',

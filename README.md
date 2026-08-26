@@ -8,7 +8,7 @@ The preview above is an illustrative UI preview. The plugin uses the active Matt
 
 ## Status and compatibility
 
-Release `v0.3.0` targets Mattermost Team Edition `v11.7.0` through `v11.10.x`:
+Release candidate `v0.3.1` targets Mattermost Team Edition `v11.7.0` through `v11.10.x`:
 
 - `v11.7` is the compatibility-floor / ESR target.
 - `v11.10` is the latest target release at the time of this implementation.
@@ -31,6 +31,7 @@ The plugin deliberately uses Mattermost's supported plugin API and webapp regist
 - Jump to the containing post and copy a full absolute Mattermost permalink to it. Files without a containing post do not show a copy action.
 - Resolve uploader profiles through Mattermost client APIs, with an `Unknown user` fallback.
 - Refresh the first page when relevant post/file WebSocket events arrive for the active channel.
+- Clear cached file metadata, message context, and previews when access to the active conversation is revoked.
 - Use a theme-aware file icon, Mattermost CSS variables, visible focus states, localized English strings, and narrow RHS-friendly layout.
 
 v1 intentionally does not provide deletion, public-link generation, team-wide file lists, administrator-only views, or external file sharing.
@@ -68,7 +69,7 @@ Native search inherits Mattermost configuration and indexing behavior. If file s
    make dist
    ```
 
-3. In Mattermost, open **System Console → Plugins → Management**, upload `dist/com.github.crypt0rr.file-overview-0.3.0.tar.gz`, and enable **File Overview**.
+3. In Mattermost, open **System Console → Plugins → Management**, upload `dist/com.github.crypt0rr.file-overview-0.3.1.tar.gz`, and enable **File Overview**.
 4. Open a conversation and use the file icon in the channel header.
 
 Copied links are full Mattermost post permalinks. Recipients must be signed in and have permission to access the conversation; the plugin does not create public file links.
@@ -119,11 +120,12 @@ The server tests use fakes for the narrow Mattermost API surface. No database or
 
 Before publishing a release:
 
-1. Run `make manifest-check`, `make check-style`, `make test-ci`, and `make dist`.
-2. Install the produced archive on the latest supported v11.7 patch and v11.10 Team Edition instances.
-3. Exercise public/private channels, DMs, GMs, archived-readable conversations, pagination beyond 125 files, multiple files per post, images/documents, deleted posts, and deleted uploaders.
-4. Verify private-channel authorization, search-disabled behavior, previews, downloads, copied links, post navigation, WebSocket refresh, disable/reactivate, and uninstall.
-5. Update `plugin.json` to the release version and tag it, for example `v0.3.0`.
+1. Update `plugin.json` to the release version and matching release-notes URL, then commit that change.
+2. Run `make manifest-check`, `make check-style`, `make test-ci`, and `make dist`.
+3. Install the produced archive on the latest supported v11.7 patch and v11.10 Team Edition instances.
+4. Exercise public/private channels, DMs, GMs, archived-readable conversations, pagination beyond 125 files, multiple files per post, images/documents, deleted posts, and deleted uploaders.
+5. Verify private-channel authorization, access revocation, search-disabled behavior, previews, downloads, copied links, post navigation, WebSocket refresh, disable/reactivate, and uninstall.
+6. After the versioned commit is merged to `main`, run the matching Makefile release target. It refuses to tag a dirty checkout or a manifest with the wrong version.
 
 The repository includes CI checks for Go tests and coverage, webapp tests and coverage, linting, TypeScript checking, production builds, packaging, and artifact upload.
 

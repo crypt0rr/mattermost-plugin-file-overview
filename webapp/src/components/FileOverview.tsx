@@ -15,7 +15,7 @@ import {getCurrentUserId} from 'mattermost-redux/selectors/entities/users';
 import FilePreview from './FilePreview';
 import FileRow from './FileRow';
 
-import {FileOverviewApiError, getChannelFiles} from '../api';
+import {getChannelFiles} from '../api';
 import {t} from '../messages';
 import {loadPostContexts} from '../post_context';
 import {
@@ -55,10 +55,13 @@ function sortItems(items: FileOverviewItem[], sort: FileOverviewSort): FileOverv
     });
 }
 
+function isPermissionDenied(error: unknown): boolean {
+    const candidate = Object(error) as {status?: unknown; statusCode?: unknown; status_code?: unknown};
+    const statuses = [candidate.status, candidate.statusCode, candidate.status_code];
+    return statuses.includes(401) || statuses.includes(403);
+}
+
 function errorMessage(error: unknown): string {
-    if (error instanceof FileOverviewApiError && error.status === 403) {
-        return t('permissionDenied');
-    }
     if (error instanceof Error && error.message) {
         return error.message;
     }
@@ -83,6 +86,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
     const [error, setError] = useState('');
     const [searchError, setSearchError] = useState('');
     const [searchLimitWarning, setSearchLimitWarning] = useState(false);
+    const [accessDenied, setAccessDenied] = useState(false);
     const [participantsLoading, setParticipantsLoading] = useState(false);
     const [participantsError, setParticipantsError] = useState(false);
     const [queryInput, setQueryInput] = useState('');
@@ -105,6 +109,27 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
         setPostContexts({});
     }, []);
 
+    const clearSensitiveState = useCallback(() => {
+        requestSerial.current += 1;
+        abortController.current?.abort();
+        abortController.current = undefined;
+        invalidatePostContexts();
+        setFiles([]);
+        setPage(0);
+        setHasMore(false);
+        setLoading(false);
+        setLoadingMore(false);
+        setPreviewFile(undefined);
+    }, [invalidatePostContexts]);
+
+    const handlePermissionDenied = useCallback(() => {
+        clearSensitiveState();
+        setAccessDenied(true);
+        setError('');
+        setSearchError('');
+        setSearchLimitWarning(false);
+    }, [clearSensitiveState]);
+
     const loadBrowse = useCallback(async (nextPage: number, append: boolean) => {
         if (!channelId) {
             return;
@@ -120,6 +145,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
             setLoadingMore(true);
         } else {
             setLoading(true);
+            setAccessDenied(false);
             setError('');
         }
         try {
@@ -132,7 +158,11 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
             setHasMore(response.has_more);
         } catch (loadError) {
             if (serial === requestSerial.current && (loadError as {name?: string}).name !== 'AbortError') {
-                setError(errorMessage(loadError));
+                if (isPermissionDenied(loadError)) {
+                    handlePermissionDenied();
+                } else {
+                    setError(errorMessage(loadError));
+                }
             }
         } finally {
             if (serial === requestSerial.current) {
@@ -140,7 +170,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
                 setLoadingMore(false);
             }
         }
-    }, [channelId, invalidatePostContexts, sort]);
+    }, [channelId, handlePermissionDenied, invalidatePostContexts, sort]);
 
     const loadSearch = useCallback(async (nextPage: number, append: boolean, request: SearchState) => {
         if (!channel || participantsError) {
@@ -154,6 +184,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
             setLoadingMore(true);
         } else {
             setLoading(true);
+            setAccessDenied(false);
             setSearchError('');
             setSearchLimitWarning(false);
             setError('');
@@ -172,7 +203,9 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
             if (serial !== requestSerial.current) {
                 return;
             }
-            if (isFileSearchUnavailable(searchLoadError)) {
+            if (isPermissionDenied(searchLoadError)) {
+                handlePermissionDenied();
+            } else if (isFileSearchUnavailable(searchLoadError)) {
                 setSearchError(t('searchUnavailable'));
             } else if (searchLoadError instanceof Error) {
                 setSearchError(searchLoadError.message);
@@ -185,7 +218,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
                 setLoadingMore(false);
             }
         }
-    }, [channel, currentUserId, invalidatePostContexts, participants, participantsError]);
+    }, [channel, currentUserId, handlePermissionDenied, invalidatePostContexts, participants, participantsError]);
 
     useEffect(() => {
         setQueryInput('');
@@ -193,12 +226,9 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
         setActiveSearch(null);
         setSearchError('');
         setSearchLimitWarning(false);
-        setFiles([]);
-        setPage(0);
-        setHasMore(false);
-        setPreviewFile(undefined);
-        invalidatePostContexts();
-    }, [channelId, invalidatePostContexts]);
+        setAccessDenied(false);
+        clearSensitiveState();
+    }, [channelId, clearSensitiveState]);
 
     useEffect(() => {
         if (!channelId || activeSearch) {
@@ -413,7 +443,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
 
     const openPreview = useCallback((file: FileOverviewItem) => setPreviewFile(file), []);
 
-    const canSearch = !participantsLoading && !participantsError && Boolean(channel);
+    const canSearch = !accessDenied && !participantsLoading && !participantsError && Boolean(channel);
     const initialLoading = loading && files.length === 0;
 
     const refreshFiles = () => {
@@ -473,6 +503,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
                         value={queryInput}
                         onChange={(event) => setQueryInput(event.target.value)}
                         placeholder={t('filename')}
+                        disabled={!canSearch}
                     />
                     <button
                         type='submit'
@@ -514,6 +545,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
                     id='file-overview-sort'
                     value={`${sort.sort}:${sort.direction}`}
                     onChange={changeSort}
+                    disabled={accessDenied}
                 >
                     <option value='create_at:desc'>{t('newest')}</option>
                     <option value='create_at:asc'>{t('oldest')}</option>
@@ -523,10 +555,22 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
             </div>
 
             <div className='file-overview__body'>
-                {participantsError && (
+                {accessDenied && (
+                    <div
+                        className='file-overview__access-denied'
+                        role='alert'
+                    >
+                        <p>{t('permissionDenied')}</p>
+                        <button
+                            type='button'
+                            onClick={retry}
+                        >{t('retry')}</button>
+                    </div>
+                )}
+                {!accessDenied && participantsError && (
                     <p className='file-overview__notice'>{t('searchParticipantsUnavailable')}</p>
                 )}
-                {searchError && (
+                {!accessDenied && searchError && (
                     <div
                         className='file-overview__error'
                         role='alert'
@@ -538,8 +582,8 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
                         >{t('retry')}</button>
                     </div>
                 )}
-                {searchLimitWarning && <p className='file-overview__notice'>{t('searchLimit')}</p>}
-                {error && (
+                {!accessDenied && searchLimitWarning && <p className='file-overview__notice'>{t('searchLimit')}</p>}
+                {!accessDenied && error && (
                     <div
                         className='file-overview__error'
                         role='alert'
@@ -552,22 +596,22 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
                     </div>
                 )}
 
-                {initialLoading && (
+                {!accessDenied && initialLoading && (
                     <div
                         className='file-overview__loading'
                         role='status'
                     >{t('loading')}</div>
                 )}
-                {loading && files.length > 0 && (
+                {!accessDenied && loading && files.length > 0 && (
                     <p
                         className='file-overview__stale'
                         role='status'
                     >{t('staleData')}</p>
                 )}
-                {!loading && visibleFiles.length === 0 && !error && !searchError && (
+                {!accessDenied && !loading && visibleFiles.length === 0 && !error && !searchError && (
                     <p className='file-overview__empty'>{activeSearch ? t('noSearchResults') : t('empty')}</p>
                 )}
-                {visibleFiles.length > 0 && (
+                {!accessDenied && visibleFiles.length > 0 && (
                     <div
                         className='file-overview__list'
                         aria-label={t('channelFiles')}
@@ -596,7 +640,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
                         })}
                     </div>
                 )}
-                {hasMore && !loading && (
+                {!accessDenied && hasMore && !loading && (
                     <button
                         className='file-overview__load-more'
                         type='button'
@@ -607,7 +651,7 @@ export default function FileOverview({team: teamProp, channel: channelProp}: Pro
                     </button>
                 )}
             </div>
-            {previewFile && previewIndex >= 0 && (
+            {!accessDenied && previewFile && previewIndex >= 0 && (
                 <FilePreview
                     file={previewFile}
                     user={profiles[previewFile.creator_id]}
