@@ -60,6 +60,7 @@ jest.mock('../search', () => ({
 }));
 
 import FileOverview from './FileOverview';
+import FilePreview from './FilePreview';
 import FileRow from './FileRow';
 
 import {FileOverviewApiError, getChannelFiles} from '../api';
@@ -133,7 +134,11 @@ function response(items: FileOverviewItem[] = [], overrides: Partial<ChannelFile
 }
 
 function findButton(renderer: ReactTestRenderer, predicate: (button: ReactTestInstance) => boolean): ReactTestInstance {
-    const button = renderer.root.findAllByType('button').find(predicate);
+    return findButtonIn(renderer.root, predicate);
+}
+
+function findButtonIn(node: ReactTestInstance, predicate: (button: ReactTestInstance) => boolean): ReactTestInstance {
+    const button = node.findAllByType('button').find(predicate);
     if (!button) {
         throw new Error('Expected button was not rendered');
     }
@@ -203,7 +208,7 @@ test('renders metadata, image previews, copy links, stale refreshes, and load mo
     expect(renderer.root.findAllByType('article')).toHaveLength(2);
     expect(renderer.root.findByProps({className: 'file-overview__body'}).findByProps({className: 'file-overview__list'})).toBeDefined();
     expect(renderer.root.findAllByType('a')[0].props.href).toBe('https://mattermost.example/file/file-2');
-    expect(renderer.root.findByProps({className: 'file-overview__action-link'}).props.href).toBe('https://mattermost.example/file/file-2');
+    expect(renderer.root.findAllByProps({className: 'file-overview__action-link'})).toHaveLength(0);
     expect(renderer.root.findByProps({className: 'file-overview__list'}).props['aria-label']).toBe('Files in this conversation');
     expect(renderer.root.findAllByType('div').filter((node) => String(node.props.className).includes('file-overview__thumbnail--pdf'))).toHaveLength(1);
 
@@ -227,8 +232,19 @@ test('renders metadata, image previews, copy links, stale refreshes, and load mo
         throw new Error('Expected the document filename link to be rendered');
     }
     const preventDocumentNavigation = jest.fn();
-    documentNameLink.props.onClick({preventDefault: preventDocumentNavigation});
-    expect(preventDocumentNavigation).not.toHaveBeenCalled();
+    await act(async () => {
+        documentNameLink.props.onClick({preventDefault: preventDocumentNavigation});
+        await Promise.resolve();
+    });
+    expect(preventDocumentNavigation).toHaveBeenCalled();
+    expect(renderer.root.findByType('iframe').props).toMatchObject({
+        src: 'https://mattermost.example/file/file-2',
+        title: 'Preview of notes.pdf',
+    });
+    await act(async () => {
+        findButton(renderer, (button) => button.props['aria-label'] === 'Close preview').props.onClick();
+        await Promise.resolve();
+    });
     const noPostRow = renderer.root.findAllByType(FileRow).find((row) => !row.props.file.post_id);
     if (!noPostRow) {
         throw new Error('Expected a file row without a containing post');
@@ -248,7 +264,11 @@ test('renders metadata, image previews, copy links, stale refreshes, and load mo
     expect(clipboard.writeText).toHaveBeenCalledWith('http://localhost:8065/engineering/pl/post-1');
     expect(renderer.root.findAllByType('button').some((button) => buttonText(button) === 'Copied')).toBe(true);
 
-    const previewButton = findButton(renderer, (button) => button.props['aria-label'] === 'Preview file');
+    const imageRow = renderer.root.findAllByType(FileRow).find((row) => row.props.file.id === image.id);
+    if (!imageRow) {
+        throw new Error('Expected the image row to be rendered');
+    }
+    const previewButton = findButtonIn(imageRow, (button) => button.props['aria-label'] === 'Preview file');
     await act(async () => {
         previewButton.props.onClick();
         await Promise.resolve();
@@ -264,7 +284,7 @@ test('renders metadata, image previews, copy links, stale refreshes, and load mo
     });
     expect(renderer.root.findAllByProps({role: 'dialog'})).toHaveLength(0);
 
-    const actionPreview = findButton(renderer, (button) => buttonText(button) === 'Preview file');
+    const actionPreview = findButtonIn(imageRow, (button) => buttonText(button) === 'Preview file');
     await act(async () => {
         actionPreview.props.onClick();
         await Promise.resolve();
@@ -315,6 +335,25 @@ test('renders metadata, image previews, copy links, stale refreshes, and load mo
         await Promise.resolve();
     });
     expect(renderer.root.findAllByType('article')).toHaveLength(2);
+
+    const textLink = renderer.root.findAllByProps({className: 'file-overview__name'}).find((link) => link.props.href === 'https://mattermost.example/file/file-3');
+    if (!textLink) {
+        throw new Error('Expected the text filename link to be rendered');
+    }
+    const preventTextNavigation = jest.fn();
+    await act(async () => {
+        textLink.props.onClick({preventDefault: preventTextNavigation});
+        await Promise.resolve();
+    });
+    expect(preventTextNavigation).toHaveBeenCalled();
+    expect(renderer.root.findByType('iframe').props).toMatchObject({
+        src: 'https://mattermost.example/file/file-3',
+        sandbox: '',
+    });
+    await act(async () => {
+        findButton(renderer, (button) => button.props['aria-label'] === 'Close preview').props.onClick();
+        await Promise.resolve();
+    });
 
     Object.defineProperty(navigator, 'clipboard', {configurable: true, value: undefined});
     await act(async () => {
@@ -371,6 +410,7 @@ test('previews video and audio files without navigating away', async () => {
         extension: 'mp4',
         mime_type: 'video/mp4',
         has_preview_image: false,
+        create_at: Date.UTC(2026, 1, 2, 3, 4),
     });
     const audio = file({
         id: 'audio-1',
@@ -378,6 +418,7 @@ test('previews video and audio files without navigating away', async () => {
         extension: 'mp3',
         mime_type: 'audio/mpeg',
         has_preview_image: false,
+        create_at: Date.UTC(2026, 0, 2, 3, 4),
     });
     getChannelFilesMock.mockResolvedValueOnce(response([video, audio]));
     const renderer = await renderOverview();
@@ -400,6 +441,37 @@ test('previews video and audio files without navigating away', async () => {
     });
     expect(renderer.root.findAllByProps({role: 'dialog'})).toHaveLength(1);
 
+    expect(findButton(renderer, (button) => buttonText(button) === 'Previous file').props.disabled).toBe(true);
+    expect(findButton(renderer, (button) => buttonText(button) === 'Next file').props.disabled).toBe(false);
+    await act(async () => {
+        findButton(renderer, (button) => buttonText(button) === 'Previous file').props.onClick();
+        await Promise.resolve();
+    });
+    expect(renderer.root.findAllByType('video')).toHaveLength(1);
+    const mediaControlEvent = new Event('keydown') as KeyboardEvent;
+    Object.defineProperty(mediaControlEvent, 'key', {value: 'ArrowRight'});
+    Object.defineProperty(mediaControlEvent, 'target', {value: {tagName: 'VIDEO'}});
+    document.dispatchEvent(mediaControlEvent);
+    expect(renderer.root.findAllByType('video')).toHaveLength(1);
+
+    await act(async () => {
+        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight'}));
+        await Promise.resolve();
+    });
+    expect(renderer.root.findByType('audio').props.src).toBe('https://mattermost.example/file/audio-1');
+    expect(findButton(renderer, (button) => buttonText(button) === 'Previous file').props.disabled).toBe(false);
+    expect(findButton(renderer, (button) => buttonText(button) === 'Next file').props.disabled).toBe(true);
+    await act(async () => {
+        findButton(renderer, (button) => buttonText(button) === 'Next file').props.onClick();
+        await Promise.resolve();
+    });
+    expect(renderer.root.findAllByType('audio')).toHaveLength(1);
+    await act(async () => {
+        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowLeft'}));
+        await Promise.resolve();
+    });
+    expect(renderer.root.findAllByType('video')).toHaveLength(1);
+
     await act(async () => {
         findButton(renderer, (button) => button.props['aria-label'] === 'Close preview').props.onClick();
         await Promise.resolve();
@@ -419,6 +491,35 @@ test('previews video and audio files without navigating away', async () => {
         src: 'https://mattermost.example/file/audio-1',
         controls: true,
         preload: 'metadata',
+    });
+    renderer.unmount();
+});
+
+test('keeps unsupported files in the viewer with an explicit open fallback', () => {
+    const unsupported = file({
+        id: 'archive-1',
+        name: 'archive.zip',
+        extension: 'zip',
+        mime_type: 'application/zip',
+        has_preview_image: false,
+    });
+    const renderer = create(
+        <FilePreview
+            file={unsupported}
+            position={1}
+            total={1}
+            hasPrevious={false}
+            hasNext={false}
+            onPrevious={jest.fn()}
+            onNext={jest.fn()}
+            onClose={jest.fn()}
+        />,
+    );
+
+    const fallback = renderer.root.findByProps({className: 'file-overview__preview-fallback'});
+    expect(nodeText(fallback)).toContain('cannot be previewed');
+    expect(fallback.findByType('a').props).toMatchObject({
+        href: 'https://mattermost.example/file/archive-1',
     });
     renderer.unmount();
 });
@@ -712,6 +813,10 @@ test('resets the copied state after the feedback timeout', async () => {
             />,
         );
         await act(async () => {
+            const nameLink = renderer.root.findByProps({className: 'file-overview__name'});
+            const preventNavigation = jest.fn();
+            nameLink.props.onClick({preventDefault: preventNavigation});
+            expect(preventNavigation).not.toHaveBeenCalled();
             findButton(renderer, (button) => buttonText(button).includes('Copy link to post')).props.onClick();
             await Promise.resolve();
         });
