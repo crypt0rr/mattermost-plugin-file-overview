@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Illustrative Mattermost File Overview sidebar</title>
+  <desc id="desc">A dark Mattermost-style conversation with a Files right-hand sidebar containing file rows and search controls.</desc>
+  <rect width="1200" height="720" fill="#1d1c1d"/>
+  <rect width="1200" height="56" fill="#252326"/>
+  <rect y="56" width="190" height="664" fill="#201f21"/>
+  <rect x="190" y="56" width="710" height="664" fill="#2b292c"/>
+  <rect x="900" y="56" width="300" height="664" fill="#343136"/>
+  <text x="24" y="35" fill="#f2f2f2" font-family="Arial, sans-serif" font-size="18" font-weight="700">Mattermost</text>
+  <text x="214" y="35" fill="#f2f2f2" font-family="Arial, sans-serif" font-size="16" font-weight="700"># engineering</text>
+  <rect x="836" y="16" width="34" height="26" rx="4" fill="#5795f7"/>
+  <path d="M846 22h11l6 6v10h-17z" fill="none" stroke="#fff" stroke-width="2"/>
+  <text x="24" y="94" fill="#aaa6ad" font-family="Arial, sans-serif" font-size="13">CHANNELS</text>
+  <text x="24" y="126" fill="#f2f2f2" font-family="Arial, sans-serif" font-size="15"># engineering</text>
+  <text x="24" y="158" fill="#aaa6ad" font-family="Arial, sans-serif" font-size="15"># design</text>
+  <text x="214" y="128" fill="#f2f2f2" font-family="Arial, sans-serif" font-size="15" font-weight="700">File handoff</text>
+  <text x="214" y="158" fill="#aaa6ad" font-family="Arial, sans-serif" font-size="13">Here are the latest documents.</text>
+  <rect x="214" y="185" width="520" height="50" rx="6" fill="#3a373b"/>
+  <text x="234" y="216" fill="#aaa6ad" font-family="Arial, sans-serif" font-size="14">project-files.zip</text>
+  <rect x="900" y="56" width="300" height="58" fill="#3d393f"/>
+  <text x="920" y="91" fill="#f2f2f2" font-family="Arial, sans-serif" font-size="18" font-weight="700">Files</text>
+  <text x="920" y="129" fill="#aaa6ad" font-family="Arial, sans-serif" font-size="13">engineering</text>
+  <rect x="920" y="152" width="260" height="34" rx="4" fill="#2a282b" stroke="#5b565d"/>
+  <text x="934" y="174" fill="#aaa6ad" font-family="Arial, sans-serif" font-size="12">Filename</text>
+  <rect x="920" y="195" width="125" height="30" rx="4" fill="#2a282b" stroke="#5b565d"/>
+  <text x="934" y="215" fill="#aaa6ad" font-family="Arial, sans-serif" font-size="12">Extension</text>
+  <rect x="1052" y="195" width="128" height="30" rx="4" fill="#2a282b" stroke="#5b565d"/>
+  <text x="1066" y="215" fill="#aaa6ad" font-family="Arial, sans-serif" font-size="12">Newest first</text>
+  <g font-family="Arial, sans-serif">
+    <line x1="920" y1="250" x2="1180" y2="250" stroke="#504b52"/>
+    <rect x="920" y="266" width="38" height="38" rx="4" fill="#5795f7"/>
+    <text x="931" y="291" fill="#fff" font-size="12" font-weight="700">PDF</text>
+    <text x="970" y="281" fill="#5795f7" font-size="13" font-weight="700">design-notes.pdf</text>
+    <text x="970" y="300" fill="#aaa6ad" font-size="11">Uploaded by Alice · Aug 25, 2026 · 2.4 MB</text>
+    <text x="970" y="322" fill="#5795f7" font-size="11">Preview  Jump to post  Copy link</text>
+    <line x1="920" y1="345" x2="1180" y2="345" stroke="#504b52"/>
+    <rect x="920" y="361" width="38" height="38" rx="4" fill="#5b8def"/>
+    <text x="930" y="386" fill="#fff" font-size="12" font-weight="700">IMG</text>
+    <text x="970" y="376" fill="#5795f7" font-size="13" font-weight="700">wireframe.png</text>
+    <text x="970" y="395" fill="#aaa6ad" font-size="11">Uploaded by Unknown user · Aug 24, 2026 · 820 KB</text>
+    <text x="970" y="417" fill="#5795f7" font-size="11">Preview  Jump to post  Copy link</text>
+    <line x1="920" y1="440" x2="1180" y2="440" stroke="#504b52"/>
+    <rect x="920" y="456" width="38" height="38" rx="4" fill="#65616a"/>
+    <text x="928" y="481" fill="#fff" font-size="12" font-weight="700">ZIP</text>
+    <text x="970" y="471" fill="#5795f7" font-size="13" font-weight="700">project-files.zip</text>
+    <text x="970" y="490" fill="#aaa6ad" font-size="11">Uploaded by Bob · Aug 22, 2026 · 14.8 MB</text>
+    <text x="970" y="512" fill="#5795f7" font-size="11">Jump to post  Copy link</text>
+  </g>
+  <rect x="920" y="650" width="260" height="36" rx="4" fill="#2a282b" stroke="#5b565d"/>
+  <text x="1001" y="673" fill="#5795f7" font-family="Arial, sans-serif" font-size="13" font-weight="700">Load more</text>
+</svg>
