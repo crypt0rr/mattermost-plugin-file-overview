@@ -6,6 +6,7 @@ import {
     filePreviewKind,
     formatFileDate,
     formatFileSize,
+    summarizePostMessage,
 } from './format';
 
 test('formats file sizes across byte units', () => {
@@ -40,4 +41,10 @@ test('uses a stable uploader fallback and identifies file kinds', () => {
 
 test('formats upload dates as localized date-time strings', () => {
     expect(formatFileDate(Date.UTC(2026, 0, 2, 3, 4))).toEqual(expect.any(String));
+});
+
+test('summarizes post messages for the file context card', () => {
+    expect(summarizePostMessage('  A message\nwith   compact spacing.  ')).toBe('A message with compact spacing.');
+    expect(summarizePostMessage('')).toBe('');
+    expect(summarizePostMessage('x'.repeat(141))).toBe(`${'x'.repeat(139)}…`);
 });

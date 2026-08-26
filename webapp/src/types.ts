@@ -13,6 +13,14 @@ export type FileOverviewItem = {
     has_preview_image: boolean;
 };
 
+export type FilePostContext = {
+    id: string;
+    channel_id: string;
+    user_id: string;
+    create_at: number;
+    message: string;
+};
+
 export type ChannelFilesResponse = {
     items: FileOverviewItem[];
     page: number;
