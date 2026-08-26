@@ -202,11 +202,12 @@ test('renders metadata, image previews, copy links, stale refreshes, and load mo
 
     expect(renderer.root.findAllByType('article')).toHaveLength(2);
     expect(renderer.root.findByProps({className: 'file-overview__body'}).findByProps({className: 'file-overview__list'})).toBeDefined();
-    expect(renderer.root.findAllByType('a')[0].props.href).toBe('/file/file-2');
+    expect(renderer.root.findAllByType('a')[0].props.href).toBe('https://mattermost.example/file/file-2');
+    expect(renderer.root.findByProps({className: 'file-overview__action-link'}).props.href).toBe('https://mattermost.example/file/file-2');
     expect(renderer.root.findByProps({className: 'file-overview__list'}).props['aria-label']).toBe('Files in this conversation');
     expect(renderer.root.findAllByType('div').filter((node) => String(node.props.className).includes('file-overview__thumbnail--pdf'))).toHaveLength(1);
 
-    const imageNameLink = renderer.root.findAllByProps({className: 'file-overview__name'}).find((link) => link.props.href === '/file/file-1');
+    const imageNameLink = renderer.root.findAllByProps({className: 'file-overview__name'}).find((link) => link.props.href === 'https://mattermost.example/file/file-1');
     if (!imageNameLink) {
         throw new Error('Expected the image filename link to be rendered');
     }
@@ -221,7 +222,7 @@ test('renders metadata, image previews, copy links, stale refreshes, and load mo
         document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
         await Promise.resolve();
     });
-    const documentNameLink = renderer.root.findAllByProps({className: 'file-overview__name'}).find((link) => link.props.href === '/file/file-2');
+    const documentNameLink = renderer.root.findAllByProps({className: 'file-overview__name'}).find((link) => link.props.href === 'https://mattermost.example/file/file-2');
     if (!documentNameLink) {
         throw new Error('Expected the document filename link to be rendered');
     }
@@ -239,11 +240,12 @@ test('renders metadata, image previews, copy links, stale refreshes, and load mo
     expect(renderer.root.findAllByType('button').filter((button) => buttonText(button) === 'Copy link to post')).toHaveLength(1);
 
     const copyButton = findButton(renderer, (button) => buttonText(button).includes('Copy link to post'));
+    mockClient4.getUrl.mockReturnValueOnce('');
     await act(async () => {
         copyButton.props.onClick();
         await Promise.resolve();
     });
-    expect(clipboard.writeText).toHaveBeenCalledWith('https://mattermost.example/engineering/pl/post-1');
+    expect(clipboard.writeText).toHaveBeenCalledWith('http://localhost:8065/engineering/pl/post-1');
     expect(renderer.root.findAllByType('button').some((button) => buttonText(button) === 'Copied')).toBe(true);
 
     const previewButton = findButton(renderer, (button) => button.props['aria-label'] === 'Preview file');
@@ -360,6 +362,65 @@ test('shows initial loading, error, permission, and retry states', async () => {
     const genericRenderer = await renderOverview();
     expect(nodeText(genericRenderer.root.findByProps({role: 'alert'}))).toContain('could not be loaded');
     genericRenderer.unmount();
+});
+
+test('previews video and audio files without navigating away', async () => {
+    const video = file({
+        id: 'video-1',
+        name: 'clip.mp4',
+        extension: 'mp4',
+        mime_type: 'video/mp4',
+        has_preview_image: false,
+    });
+    const audio = file({
+        id: 'audio-1',
+        name: 'recording.mp3',
+        extension: 'mp3',
+        mime_type: 'audio/mpeg',
+        has_preview_image: false,
+    });
+    getChannelFilesMock.mockResolvedValueOnce(response([video, audio]));
+    const renderer = await renderOverview();
+
+    const videoLink = renderer.root.findAllByProps({className: 'file-overview__name'}).find((link) => link.props.href === 'https://mattermost.example/file/video-1');
+    if (!videoLink) {
+        throw new Error('Expected the video filename link to be rendered');
+    }
+    const preventVideoNavigation = jest.fn();
+    await act(async () => {
+        videoLink.props.onClick({preventDefault: preventVideoNavigation});
+        await Promise.resolve();
+    });
+    expect(preventVideoNavigation).toHaveBeenCalled();
+    expect(renderer.root.findByType('video').props).toMatchObject({
+        src: 'https://mattermost.example/file/video-1',
+        controls: true,
+        playsInline: true,
+        preload: 'metadata',
+    });
+    expect(renderer.root.findAllByProps({role: 'dialog'})).toHaveLength(1);
+
+    await act(async () => {
+        findButton(renderer, (button) => button.props['aria-label'] === 'Close preview').props.onClick();
+        await Promise.resolve();
+    });
+
+    const audioLink = renderer.root.findAllByProps({className: 'file-overview__name'}).find((link) => link.props.href === 'https://mattermost.example/file/audio-1');
+    if (!audioLink) {
+        throw new Error('Expected the audio filename link to be rendered');
+    }
+    const preventAudioNavigation = jest.fn();
+    await act(async () => {
+        audioLink.props.onClick({preventDefault: preventAudioNavigation});
+        await Promise.resolve();
+    });
+    expect(preventAudioNavigation).toHaveBeenCalled();
+    expect(renderer.root.findByType('audio').props).toMatchObject({
+        src: 'https://mattermost.example/file/audio-1',
+        controls: true,
+        preload: 'metadata',
+    });
+    renderer.unmount();
 });
 
 test('submits native search, handles disabled search, clears it, and changes sorting', async () => {

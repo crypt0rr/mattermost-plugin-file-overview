@@ -1,7 +1,7 @@
 {
     "id": "com.github.crypt0rr.file-overview",
     "name": "File Overview",
-    "version": "0.1.0",
+    "version": "0.1.2",
     "description": "Browse files attached to the current Mattermost conversation.",
     "homepage_url": "https://github.com/crypt0rr/mattermost-plugin-file-overview",
     "support_url": "https://github.com/crypt0rr/mattermost-plugin-file-overview/issues",

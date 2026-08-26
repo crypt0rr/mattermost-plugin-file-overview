@@ -7,6 +7,7 @@ import {Client4} from 'mattermost-redux/client';
 import {displayUser, fileKind, formatFileDate, formatFileSize} from '../format';
 import {t} from '../messages';
 import type {FileOverviewItem} from '../types';
+import {mattermostFileUrl} from '../urls';
 
 type Props = {
     file: FileOverviewItem;
@@ -19,7 +20,8 @@ type Props = {
 export default function FileRow({file, user, onPreview, onJump, onCopy}: Props) {
     const [copied, setCopied] = useState(false);
     const kind = fileKind(file.mime_type, file.extension);
-    const canPreview = file.has_preview_image && kind === 'image';
+    const canPreview = (file.has_preview_image && kind === 'image') || kind === 'video' || kind === 'audio';
+    const fileURL = mattermostFileUrl(file.id);
 
     const handleNameClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
         if (!canPreview) {
@@ -61,7 +63,7 @@ export default function FileRow({file, user, onPreview, onJump, onCopy}: Props) 
             <div className='file-overview__details'>
                 <a
                     className='file-overview__name'
-                    href={Client4.getFileUrl(file.id, 0)}
+                    href={fileURL}
                     aria-label={`${canPreview ? t('preview') : t('open')}: ${file.name}`}
                     title={file.name}
                     onClick={handleNameClick}
@@ -83,6 +85,15 @@ export default function FileRow({file, user, onPreview, onJump, onCopy}: Props) 
                         >
                             {t('preview')}
                         </button>
+                    )}
+                    {!canPreview && (
+                        <a
+                            className='file-overview__action-link'
+                            href={fileURL}
+                            aria-label={`${t('open')}: ${file.name}`}
+                        >
+                            {t('open')}
+                        </a>
                     )}
                     <button
                         type='button'
