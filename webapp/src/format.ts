@@ -27,6 +27,15 @@ export function formatFileDate(createAt: number): string {
     }).format(new Date(createAt));
 }
 
+export function summarizePostMessage(message: string): string {
+    const normalizedMessage = message.replace(/\s+/g, ' ').trim();
+    const maxLength = 140;
+    if (normalizedMessage.length <= maxLength) {
+        return normalizedMessage;
+    }
+    return `${normalizedMessage.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
 export function displayUser(user?: UserProfile, unknownUser = 'Unknown user'): string {
     if (!user) {
         return unknownUser;

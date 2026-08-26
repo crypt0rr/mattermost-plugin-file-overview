@@ -7,6 +7,7 @@ import {act, create} from 'react-test-renderer';
 import type {ReactTestInstance, ReactTestRenderer} from 'react-test-renderer';
 
 import type {Channel} from '@mattermost/types/channels';
+import type {Post} from '@mattermost/types/posts';
 import type {Team} from '@mattermost/types/teams';
 import type {UserProfile} from '@mattermost/types/users';
 
@@ -27,6 +28,7 @@ jest.mock('mattermost-redux/client', () => ({
         getFilePreviewUrl: jest.fn((id: string) => `/preview/${id}`),
         getFileThumbnailUrl: jest.fn((id: string) => `/thumbnail/${id}`),
         getFileUrl: jest.fn((id: string) => `/file/${id}`),
+        getPostsByIds: jest.fn(),
         getProfilesByIds: jest.fn(),
         getUrl: jest.fn(() => 'https://mattermost.example'),
     },
@@ -77,6 +79,7 @@ const mockClient4 = Client4 as unknown as {
     getFilePreviewUrl: jest.Mock;
     getFileThumbnailUrl: jest.Mock;
     getFileUrl: jest.Mock;
+    getPostsByIds: jest.Mock;
     getProfilesByIds: jest.Mock;
     getUrl: jest.Mock;
 };
@@ -133,6 +136,19 @@ function response(items: FileOverviewItem[] = [], overrides: Partial<ChannelFile
     };
 }
 
+function post(overrides: Partial<Post> = {}): Post {
+    return {
+        id: 'post-1',
+        channel_id: baseChannel.id,
+        user_id: 'user-1',
+        create_at: 123,
+        delete_at: 0,
+        state: undefined,
+        message: 'A useful message',
+        ...overrides,
+    } as Post;
+}
+
 function findButton(renderer: ReactTestRenderer, predicate: (button: ReactTestInstance) => boolean): ReactTestInstance {
     return findButtonIn(renderer.root, predicate);
 }
@@ -185,6 +201,7 @@ beforeEach(() => {
     });
     getChannelFilesMock.mockResolvedValue(response());
     isFileSearchUnavailableMock.mockReturnValue(false);
+    mockClient4.getPostsByIds.mockResolvedValue([]);
     mockClient4.getProfilesByIds.mockResolvedValue([{id: 'user-1', username: 'alice'}]);
     Object.defineProperty(navigator, 'clipboard', {configurable: true, value: clipboard});
     document.execCommand = jest.fn().mockReturnValue(true);
@@ -367,6 +384,150 @@ test('renders metadata, image previews, copy links, stale refreshes, and load mo
         await Promise.resolve();
     });
     expect(getChannelFilesMock).toHaveBeenCalledWith(baseChannel.id, 0, {sort: 'create_at', direction: 'asc'}, expect.anything());
+});
+
+test('shows message context and groups adjacent attachments from the same post', async () => {
+    const firstAttachment = file({
+        id: 'shared-a',
+        post_id: 'shared-post',
+        create_at: 3000,
+        name: 'checklist.png',
+    });
+    const secondAttachment = file({
+        id: 'shared-b',
+        post_id: 'shared-post',
+        create_at: 3000,
+        name: 'checklist.txt',
+        extension: 'txt',
+        mime_type: 'text/plain',
+        has_preview_image: false,
+    });
+    const separateAttachment = file({
+        id: 'separate-file',
+        post_id: 'separate-post',
+        create_at: 2000,
+        name: 'notes.bin',
+        extension: 'bin',
+        mime_type: 'application/octet-stream',
+        has_preview_image: false,
+    });
+    getChannelFilesMock.mockResolvedValueOnce(response([firstAttachment, secondAttachment, separateAttachment]));
+    mockClient4.getPostsByIds.mockResolvedValueOnce([
+        post({
+            id: 'shared-post',
+            user_id: 'missing-post-author',
+            create_at: 3000,
+            message: '  Please review the final deployment checklist.  ',
+        }),
+        post({
+            id: 'separate-post',
+            user_id: 'user-1',
+            create_at: 2000,
+            message: '',
+        }),
+    ]);
+    const renderer = await renderOverview();
+    await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+    });
+
+    expect(mockClient4.getPostsByIds).toHaveBeenCalledWith(['shared-post', 'separate-post']);
+    expect(renderer.root.findAllByProps({className: 'file-overview__post-context'})).toHaveLength(2);
+    expect(nodeText(renderer.root.findAllByProps({className: 'file-overview__post-context'})[0])).toContain('Please review the final deployment checklist.');
+    expect(nodeText(renderer.root.findAllByProps({className: 'file-overview__post-context'})[0])).toContain('2 files in this message');
+    expect(nodeText(renderer.root.findAllByProps({className: 'file-overview__post-context'})[1])).toContain('No message text');
+    expect(nodeText(renderer.root.findAllByProps({className: 'file-overview__post-context'})[0])).toContain('Unknown user');
+    expect(renderer.root.findAllByProps({className: 'file-overview__row file-overview__row--same-post'})).toHaveLength(1);
+    expect(renderer.root.findAllByProps({className: 'file-overview__post-context-message'})).toHaveLength(2);
+    expect(renderer.root.findAllByProps({className: 'file-overview__post-context-message'})[0].props['aria-label']).toContain('Jump to message');
+    const originalLocation = window.location;
+    const assign = jest.fn();
+    Object.defineProperty(window, 'location', {configurable: true, value: {assign}});
+    renderer.root.findAllByProps({className: 'file-overview__post-context-message'})[0].props.onClick();
+    expect(assign).toHaveBeenCalledWith('https://mattermost.example/pl/shared-post');
+    Object.defineProperty(window, 'location', {configurable: true, value: originalLocation});
+    renderer.unmount();
+});
+
+test('shows loading and unavailable states when message context cannot be resolved', async () => {
+    let resolvePosts!: (posts: Post[]) => void;
+    mockClient4.getPostsByIds.mockReturnValueOnce(new Promise((resolve) => {
+        resolvePosts = resolve;
+    }));
+    getChannelFilesMock.mockResolvedValueOnce(response([file({post_id: 'pending-post'})]));
+    const renderer = await renderOverview();
+    await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+    });
+    expect(nodeText(renderer.root.findByProps({className: 'file-overview__post-context'}))).toContain('Loading message context');
+
+    await act(async () => {
+        resolvePosts([]);
+        await Promise.resolve();
+        await Promise.resolve();
+    });
+    expect(nodeText(renderer.root.findByProps({className: 'file-overview__post-context'}))).toContain('Message context unavailable');
+    renderer.unmount();
+
+    mockClient4.getPostsByIds.mockRejectedValueOnce(new Error('post lookup failed'));
+    getChannelFilesMock.mockResolvedValueOnce(response([file({id: 'rejected-context', post_id: 'rejected-post'})]));
+    const rejectedRenderer = await renderOverview();
+    await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+    });
+    expect(nodeText(rejectedRenderer.root.findByProps({className: 'file-overview__post-context'}))).toContain('Message context unavailable');
+    rejectedRenderer.unmount();
+});
+
+test('ignores message context responses from a previous channel', async () => {
+    let resolveOldContext!: (posts: Post[]) => void;
+    let rejectAlternateContext!: (reason: unknown) => void;
+    mockClient4.getPostsByIds.mockReturnValueOnce(new Promise((resolve) => {
+        resolveOldContext = resolve;
+    }));
+    mockClient4.getPostsByIds.mockReturnValueOnce(new Promise((_, reject) => {
+        rejectAlternateContext = reject;
+    }));
+    getChannelFilesMock.mockResolvedValueOnce(response([file({post_id: 'old-channel-post'})]));
+    getChannelFilesMock.mockResolvedValueOnce(response([file({id: 'alternate-file', post_id: 'alternate-post', channel_id: alternateChannel.id})]));
+    getChannelFilesMock.mockResolvedValueOnce(response());
+    const renderer = await renderOverview();
+    await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+    });
+
+    await act(async () => {
+        renderer.update(<FileOverview channel={alternateChannel}/>);
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+    });
+    expect(mockClient4.getPostsByIds).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+        resolveOldContext([post({id: 'old-channel-post'})]);
+        await Promise.resolve();
+    });
+    expect(nodeText(renderer.root.findByProps({className: 'file-overview__post-context'}))).toContain('Loading message context');
+
+    await act(async () => {
+        renderer.update(<FileOverview channel={baseChannel}/>);
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+    });
+    await act(async () => {
+        rejectAlternateContext(new Error('stale post lookup failed'));
+        await Promise.resolve();
+    });
+    expect(renderer.root.findAllByProps({className: 'file-overview__post-context'})).toHaveLength(0);
+    renderer.unmount();
 });
 
 test('shows initial loading, error, permission, and retry states', async () => {
